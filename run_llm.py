@@ -201,33 +201,10 @@ def main(cli_args):
         peak_mem = torch.cuda.max_memory_allocated()
     except Exception as e:
         logging.error(f"Unable to extract peak memory statistics! {e}")
-    if cli_args.with_profiling:
-        logging.info("Last profiling table:")
-        logging.info(profiling_tables[-1][-1])
+
     logging.info(f"Predictions: {predictions[:3]}")
     logging.info(f"References: {references[:3]}")
     logging.info(f"Wall Time: {all_time}s")
-
-    custom_kernel_name = (
-        "hf_sampler" if custom_sampling_fn is None else f"{cli_args.kernel_name}"
-    )
-    time_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    target_model = cli_args.model_name.replace("/", "-").replace(".", "-")
-    assistant_model = cli_args.assistant_model_name.replace("/", "-").replace(".", "-")
-
-    profiler_path = os.path.join("profiler", "llm", cli_args.dataset.replace(".", "-"))
-    Path(profiler_path).mkdir(exist_ok=True, parents=True)
-    out_file = os.path.join(
-        profiler_path,
-        f"{custom_kernel_name}_tgt_{target_model}_ass_{assistant_model}_{cli_args.output_suffix}{time_str}.csv",
-    )
-    with open(out_file, "w") as tf:
-        tf.write(
-            "example,cuda_time_total,cpu_time_total,self_cuda_time_total,self_cpu_time_total,candidate_length,n_matches\n"
-        )
-        for ex, prof_results in enumerate(profiling_results):
-            for line in prof_results:
-                tf.write(f"{ex},{line}\n")
 
     eval_head_str = ""
     eval_str = ""
@@ -267,13 +244,42 @@ def main(cli_args):
             eval_head_str += ",".join([i for i in rouge.keys()])
             eval_str += ",".join([str(i) for i in rouge.values()])
 
-    out_file = os.path.join(
-        profiler_path,
-        f"wall_time_total_{custom_kernel_name}_tgt_{target_model}_ass_{assistant_model}_{cli_args.output_suffix}{time_str}.csv",
-    )
-    with open(out_file, "w") as tf:
-        tf.write(f"wall_time{eval_head_str},peak_mem_bytes\n")
-        tf.write(f"{all_time}{eval_str},{peak_mem}\n")
+    if cli_args.with_profiling:
+        logging.info("Last profiling table:")
+        logging.info(profiling_tables[-1][-1])
+
+        profiler_path = os.path.join(
+            "profiler", "llm", cli_args.dataset.replace(".", "-")
+        )
+        custom_kernel_name = (
+            "hf_sampler" if custom_sampling_fn is None else f"{cli_args.kernel_name}"
+        )
+        time_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        target_model = cli_args.model_name.replace("/", "-").replace(".", "-")
+        assistant_model = cli_args.assistant_model_name.replace("/", "-").replace(
+            ".", "-"
+        )
+
+        Path(profiler_path).mkdir(exist_ok=True, parents=True)
+        out_file = os.path.join(
+            profiler_path,
+            f"{custom_kernel_name}_tgt_{target_model}_ass_{assistant_model}_{cli_args.output_suffix}{time_str}.csv",
+        )
+        with open(out_file, "w") as tf:
+            tf.write(
+                "example,cuda_time_total,cpu_time_total,self_cuda_time_total,self_cpu_time_total,candidate_length,n_matches\n"
+            )
+            for ex, prof_results in enumerate(profiling_results):
+                for line in prof_results:
+                    tf.write(f"{ex},{line}\n")
+
+        out_file = os.path.join(
+            profiler_path,
+            f"wall_time_total_{custom_kernel_name}_tgt_{target_model}_ass_{assistant_model}_{cli_args.output_suffix}{time_str}.csv",
+        )
+        with open(out_file, "w") as tf:
+            tf.write(f"wall_time{eval_head_str},peak_mem_bytes\n")
+            tf.write(f"{all_time}{eval_str},{peak_mem}\n")
 
 
 if __name__ == "__main__":
